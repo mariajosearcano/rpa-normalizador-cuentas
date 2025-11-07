@@ -1,0 +1,11 @@
+id_cuenta,fecha_emision,monto,estado
+cx-001 , 2024/01/05 , 1000, enviada
+AX-002,05-02-2024, 2500.50, APROBADA
+BX003,2024-03-15, -50, pendiente
+,2024-04-01,300,rechazada
+CX-004,2024-04-31,200,aprobada
+DX-005,2024-05-10,1500.75,PENDIENTE
+EX-006,15/06/2024,3000,ENVIADA
+FX-007,2024-07-20,450.25,aprobada
+GX-008,invalid-date,100,RECHAZADA
+HX-009,2024-08-15,2000,pendiente

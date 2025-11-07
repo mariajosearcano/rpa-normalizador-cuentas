@@ -1,0 +1,6 @@
+pika==latest
+python-dotenv==latest
+pandas==latest
+pydantic==latest
+pytest==latest
+python-dateutil==latest
