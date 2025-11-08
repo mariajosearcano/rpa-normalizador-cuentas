@@ -1,0 +1,16 @@
+# Entornos Virtuales y Cachés
+/.venv/
+/.pytest_cache/
+__pycache__/
+*.pyc
+
+# Archivos de Editor y Herramientas
+/.vscode/
+.coverage
+
+# Archivos de Salida y Logs
+#/out/
+#*.log
+
+# Archivos de Configuración Local y Secreta
+*.env

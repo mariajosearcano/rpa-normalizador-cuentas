@@ -3,7 +3,7 @@ DSI Logger - Sistema de logging estructurado para observabilidad
 """
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -32,7 +32,8 @@ class DSILogger:
     def _write_log(self, level: str, step: str, message: str, **kv) -> None:
         """Escribe log en consola y archivo"""
         log_entry = {
-            "ts": datetime.utcnow().isoformat() + "Z",
+            #"ts": datetime.utcnow().isoformat() + "Z",
+            "ts": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             "bot_name": self.bot_name,
             "run_id": self.run_id,
             "level": level,

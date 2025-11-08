@@ -1,0 +1,10 @@
+{
+    "chat.mcp.serverSampling": {
+        "rpa-normalizador-cuentas/.vscode/mcp.json: filesystem": {
+            "allowedModels": [
+                "copilot/auto"
+            ]
+        }
+    },
+    "postman.settings.dotenv-detection-notification-visibility": false
+}
