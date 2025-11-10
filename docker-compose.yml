@@ -1,6 +1,6 @@
 services:
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:management
     container_name: rabbitmq
     ports:
       - "5672:5672"    # AMQP
@@ -16,7 +16,30 @@ services:
       timeout: 5s
       retries: 5
 
+  # Servicio del Bot RPA
+  rpa-bot:
+    build: .  # Le indica a Docker que use el Dockerfile en el directorio actual
+    container_name: rpa-normalizador-cuentas
+    environment:
+      # URL de RabbitMQ, usando el nombre del servicio (rabbitmq) y las credenciales
+      AMQP_URL: amqp://admin:admin123@rabbitmq:5672/
+      RABBITMQ_QUEUE: rpa.cuentas.normalizar.v1
+      RABBITMQ_EXCHANGE: rpa.direct
+      RABBITMQ_ROUTING_KEY: rpa.cuentas.normalizar.v1
+    volumes:
+      # Mapea el código fuente para que los cambios se reflejen (opcional en prod)
+      - .:/app 
+      # Mapea el directorio de salida (out/) y data (data/) para persistencia y acceso
+      - rpa_out:/app/out
+      - ./data:/app/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy # Asegura que RabbitMQ esté listo
+    # Opcional: Restart policy si el bot debe correr continuamente
+    restart: unless-stopped 
+
   n8n:
+    # ... (Resto del servicio n8n)
     image: n8nio/n8n:latest
     container_name: n8n
     ports:
@@ -32,6 +55,7 @@ services:
         condition: service_healthy
 
   loki:
+    # ... (Resto del servicio loki)
     image: grafana/loki:latest
     container_name: loki
     ports:
@@ -41,6 +65,7 @@ services:
       - loki_data:/loki
 
   grafana:
+    # ... (Resto del servicio grafana)
     image: grafana/grafana:latest
     container_name: grafana
     ports:
@@ -59,3 +84,4 @@ volumes:
   n8n_data:
   loki_data:
   grafana_data:
+  rpa_out: # Nuevo volumen para los archivos de salida del bot
