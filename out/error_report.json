@@ -1,12 +1,12 @@
 {
-  "run_id": "3",
-  "timestamp": "2025-11-08T18:32:18.007374Z",
+  "run_id": "1",
+  "timestamp": "2025-11-10T15:45:37.378799Z",
   "mensaje": "Umbral de error excedido: 40.00% > 15.00%",
-  "stacktrace_resumido": "Traceback (most recent call last):\n  File \"C:\\Users\\maria\\OneDrive - elpoli.edu.co\\Documents\\python\\rpa-normalizador-cuentas\\app\\consumer.py\", line 50, in callback\n    metrics = processor.process_file(str(filepath), payload.umbral_error)\n  File \"C:\\Users\\maria\\OneDrive - elpoli.edu.co\\Documents\\python\\rpa-normalizador-cuentas\\app\\processor.py\", line 149, in process_file\n    raise ValueError(\n        f\"Umbral de error excedido: {porcentaje_invalidos:.2%} > {umbral_error:.2%}\"\n    )\nValueError: Umbral de error excedido: 40.00% > 15.00%\n",
+  "stacktrace_resumido": "Traceback (most recent call last):\n  File \"/app/app/consumer.py\", line 50, in callback\n    metrics = processor.process_file(str(filepath), payload.umbral_error)\n  File \"/app/app/processor.py\", line 154, in process_file\n    raise ValueError(\n        f\"Umbral de error excedido: {porcentaje_invalidos:.2%} > {umbral_error:.2%}\"\n    )\nValueError: Umbral de error excedido: 40.00% > 15.00%\n",
   "metricas": null,
   "contexto": {
     "payload": {
-      "run_id": "3",
+      "run_id": "1",
       "archivo": "data/cuentas.csv",
       "operacion": "normalizar",
       "umbral_error": 0.15,
