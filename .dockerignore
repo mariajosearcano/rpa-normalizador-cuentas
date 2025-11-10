@@ -47,3 +47,6 @@ htmlcov/
 
 # Env files
 .env
+
+# Config files (se montan como volumes)
+config/
