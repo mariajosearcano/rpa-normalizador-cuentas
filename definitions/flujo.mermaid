@@ -1,0 +1,68 @@
+flowchart TD
+    Start([Inicio]) --> Trigger[Usuario activa Webhook en n8n]
+    Trigger --> GenPayload[n8n genera payload JSON con run_id]
+    GenPayload --> Publish[n8n publica mensaje a RabbitMQ<br/>Cola: rpa.cuentas.normalizar.v1]
+    
+    Publish --> Consume[Bot Python consume mensaje<br/>de RabbitMQ]
+    Consume --> Parse{Parsear y validar<br/>payload}
+    
+    Parse -->|Error| LogParseError[Log: ERROR - Payload inválido]
+    LogParseError --> CreateErrorReport1[Crear error_report.json]
+    CreateErrorReport1 --> NACK1[NACK mensaje]
+    NACK1 --> End1([Fin - Fallido])
+    
+    Parse -->|Válido| InitLogger[Inicializar logger<br/>con bot_name y run_id]
+    InitLogger --> LogStart[Log: INFO - START_PROCESSING]
+    LogStart --> CheckFile{Archivo CSV<br/>existe?}
+    
+    CheckFile -->|No| LogFileError[Log: ERROR - Archivo no encontrado]
+    LogFileError --> CreateErrorReport2[Crear error_report.json]
+    CreateErrorReport2 --> NACK2[NACK mensaje]
+    NACK2 --> End2([Fin - Fallido])
+    
+    CheckFile -->|Sí| ReadCSV[Leer archivo CSV línea por línea]
+    ReadCSV --> ProcessLoop[Procesar cada fila]
+    
+    ProcessLoop --> NormalizeID{Normalizar<br/>id_cuenta}
+    NormalizeID -->|Inválido| MarkInvalid1[Marcar registro como inválido<br/>Razón: id_cuenta_invalido]
+    NormalizeID -->|Válido| NormalizeFecha{Normalizar<br/>fecha_emision}
+    
+    NormalizeFecha -->|Inválido| MarkInvalid2[Marcar registro como inválido<br/>Razón: fecha_invalida]
+    NormalizeFecha -->|Válido| NormalizeMonto{Normalizar<br/>monto}
+    
+    NormalizeMonto -->|Inválido| MarkInvalid3[Marcar registro como inválido<br/>Razón: monto_invalido]
+    NormalizeMonto -->|Válido| NormalizeEstado{Normalizar<br/>estado}
+    
+    NormalizeEstado -->|Inválido| MarkInvalid4[Marcar registro como inválido<br/>Razón: estado_invalido]
+    NormalizeEstado -->|Válido| AddValid[Agregar registro<br/>a lista de válidos]
+    
+    MarkInvalid1 --> NextRow{Más filas?}
+    MarkInvalid2 --> NextRow
+    MarkInvalid3 --> NextRow
+    MarkInvalid4 --> NextRow
+    AddValid --> NextRow
+    
+    NextRow -->|Sí| ProcessLoop
+    NextRow -->|No| CalcMetrics[Calcular métricas:<br/>total, válidos, inválidos,<br/>% inválidos, duración]
+    
+    CalcMetrics --> CheckThreshold{% inválidos ><br/>umbral_error?}
+    
+    CheckThreshold -->|Sí| LogThresholdError[Log: ERROR - Umbral excedido]
+    LogThresholdError --> CreateErrorReport3[Crear error_report.json<br/>con métricas y contexto]
+    CreateErrorReport3 --> NACK3[NACK mensaje]
+    NACK3 --> End3([Fin - Fallido])
+    
+    CheckThreshold -->|No| SaveValid[Guardar registros válidos<br/>en cuentas_normalizadas.csv]
+    SaveValid --> SaveMetrics[Guardar metrics.json<br/>con resumen de procesamiento]
+    SaveMetrics --> LogComplete[Log: INFO - END_PROCESSING]
+    LogComplete --> ACK[ACK mensaje a RabbitMQ]
+    ACK --> End4([Fin - Exitoso])
+    
+    style Start fill:#90EE90
+    style End1 fill:#FFB6C6
+    style End2 fill:#FFB6C6
+    style End3 fill:#FFB6C6
+    style End4 fill:#90EE90
+    style CheckThreshold fill:#FFE4B5
+    style Parse fill:#FFE4B5
+    style CheckFile fill:#FFE4B5

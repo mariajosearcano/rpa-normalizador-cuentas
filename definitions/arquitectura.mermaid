@@ -1,0 +1,67 @@
+flowchart TB
+    subgraph Usuario["👤 Usuario"]
+        User[Usuario DSI]
+    end
+    
+    subgraph Orquestacion["🎯 Capa de Orquestación"]
+        N8N[n8n Workflow<br/>━━━━━━━━━━━━<br/>• Webhook Manual<br/>• Generación de run_id<br/>• Construcción de payload]
+    end
+    
+    subgraph MessageBroker["📬 Message Broker"]
+        RMQ[RabbitMQ<br/>━━━━━━━━━━━━<br/>Exchange: rpa.direct<br/>Queue: rpa.cuentas.normalizar.v1<br/>Routing Key: rpa.cuentas.normalizar.v1]
+    end
+    
+    subgraph RPABot["🤖 RPA Bot Python"]
+        Consumer[Consumer<br/>━━━━━━━━<br/>• Escucha cola<br/>• Valida payload<br/>• Maneja ACK/NACK]
+        
+        Processor[Processor<br/>━━━━━━━━<br/>• Lee CSV<br/>• Normaliza campos<br/>• Valida registros<br/>• Calcula métricas]
+        
+        Logger[DSI Logger<br/>━━━━━━━━<br/>• Logs estructurados<br/>• JSON por línea<br/>• Contexto run_id]
+        
+        Models[Models<br/>━━━━━━━━<br/>• Validación Pydantic<br/>• Tipos de datos<br/>• Reglas de negocio]
+        
+        Consumer --> Processor
+        Consumer --> Logger
+        Processor --> Logger
+        Processor --> Models
+    end
+    
+    subgraph Storage["💾 Almacenamiento"]
+        InputData[(data/<br/>cuentas.csv)]
+        OutputData[(out/<br/>━━━━━━━━<br/>• cuentas_normalizadas.csv<br/>• metrics.json<br/>• error_report.json<br/>• logs.jsonl)]
+    end
+    
+    subgraph Observability["📊 Observabilidad"]
+        Promtail[Promtail<br/>━━━━━━━━<br/>• Lee logs.jsonl<br/>• Pipeline parsing]
+        
+        Loki[Loki<br/>━━━━━━━━<br/>• Almacena logs<br/>• Indexación]
+        
+        Grafana[Grafana<br/>━━━━━━━━<br/>• Dashboard<br/>• Visualización<br/>• Alertas]
+        
+        Promtail --> Loki
+        Loki --> Grafana
+    end
+    
+    User -->|Activa webhook| N8N
+    N8N -->|Publica mensaje JSON| RMQ
+    RMQ -->|Consume mensaje| Consumer
+    
+    InputData -.->|Lee| Processor
+    Processor -->|Escribe| OutputData
+    Logger -->|Escribe| OutputData
+    
+    OutputData -.->|Monitorea| Promtail
+    
+    classDef userStyle fill:#E8F5E9,stroke:#4CAF50,stroke-width:3px
+    classDef orchStyle fill:#E3F2FD,stroke:#2196F3,stroke-width:3px
+    classDef brokerStyle fill:#FFF3E0,stroke:#FF9800,stroke-width:3px
+    classDef botStyle fill:#F3E5F5,stroke:#9C27B0,stroke-width:3px
+    classDef storageStyle fill:#EFEBE9,stroke:#795548,stroke-width:3px
+    classDef obsStyle fill:#E0F2F1,stroke:#009688,stroke-width:3px
+    
+    class Usuario userStyle
+    class Orquestacion orchStyle
+    class MessageBroker brokerStyle
+    class RPABot botStyle
+    class Storage storageStyle
+    class Observability obsStyle
