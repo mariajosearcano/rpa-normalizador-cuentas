@@ -214,6 +214,30 @@ Ejemplo de log:
   "contexto": {"payload": {...}}
 }
 ```
+---
+
+## 🔗 Integración Futura con Herramientas de Incidencias (Ticketing)
+
+Aunque no es un requisito de implementación, la arquitectura DSI enfatiza la orquestación y la automatización del ciclo de vida de los datos, incluyendo la gestión de fallos críticos.
+
+### 1. Propósito
+El objetivo es transformar el fallo de un proceso en un **incidente operacional actionable** dentro de un sistema centralizado como **Jira Service Management** o **ServiceNow**.
+
+### 2. Flujo de Notificación Automatizada
+En una implementación real, la capa de orquestación (`n8n` o `Power Automate`) se encargaría de esta tarea:
+
+1.  **Fallo del Bot:** El bot Python detecta un fallo no recuperable o el umbral de error se excede, genera el `out/error_report.json`  y envía un `NACK` a RabbitMQ.
+2.  **Activador de Orquestación:** El orquestador (n8n) está configurado para escuchar una cola de "errores" o, más comúnmente, reacciona a un *estado de fallo* en la corrida.
+3.  **Llamada a API:** El orquestador ejecuta un paso que lee el `error_report.json`  (o recibe el JSON del error por una cola dedicada) y utiliza el conector REST/API para crear un nuevo tique.
+
+### 3. Contenido del Incidente
+[cite_start]El tique creado debe contener toda la información crítica para el equipo de soporte, basándose en la estructura del reporte de error:
+
+* **Título del Tique:** `[CRÍTICO] Fallo en RPA-Normalizador-Cuentas - Umbral Excedido - Run ID: [run_id]`
+* **Prioridad:** Asignada automáticamente como "Alta".
+* **Cuerpo del Incidente:** Incluye el mensaje del error (`mensaje`), el rastreo de pila resumido (`stacktrace_resumido`) y el contexto operativo (`contexto/payload`).
+
+Esta integración asegura la trazabilidad completa del error desde su origen en el bot hasta su asignación y resolución por el equipo de Operaciones.
 
 ---
 

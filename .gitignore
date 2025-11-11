@@ -14,3 +14,8 @@ out/
 
 # Archivos de Configuración Local y Secreta
 *.env
+
+# Archivos de datos
+data/bueno.csv
+data/default.csv
+data/malo.csv
