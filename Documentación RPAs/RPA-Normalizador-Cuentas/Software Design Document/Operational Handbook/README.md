@@ -1,229 +1,303 @@
-# RPA Normalizador de Cuentas - Operational Handbook
+# 🧩 RPA Normalizador de Cuentas — Operational Handbook
 
-## 🎯 Objetivo
+## 🎯 Objetivo  
+Bot RPA que **normaliza archivos CSV de cuentas bancarias** recibidos por RabbitMQ. Estandariza y valida campos clave para garantizar calidad de datos contables del holding **DSI Factory**, con trazabilidad completa mediante **logs estructurados y observabilidad con Grafana/Loki**.
 
-Bot RPA que normaliza archivos CSV de cuentas bancarias, validando y estandarizando campos clave (ID, fechas, montos, estados) según reglas de negocio del holding DSI.
+---
 
-## 📋 Justificación
+## 📋 Justificación  
+Este RPA automatiza el proceso de limpieza y normalización de datos financieros para:
+- Reducir errores humanos en digitación.
+- Homogeneizar formatos de fechas, montos y estados.
+- Controlar umbrales de error por corrida.
+- Centralizar métricas y logs en una capa de observabilidad integrada.
+- Facilitar auditorías y depuración mediante reportes estructurados.
 
-Automatizar el proceso de limpieza y normalización de datos contables para:
-- Reducir errores humanos en la captura de datos
-- Estandarizar formatos de fechas, montos e identificadores
-- Garantizar calidad de datos antes de integración con sistemas core
-- Proporcionar trazabilidad completa mediante logs estructurados
+---
 
-## 🏗️ Arquitectura
+## ⚙️ Arquitectura
 
 ```
-n8n/Power Automate → RabbitMQ → Python Bot → CSV Normalizado + Métricas + Logs
+n8n → RabbitMQ → Bot Python → CSV Normalizado + Métricas + Logs → Loki → Grafana
 ```
 
-**Componentes:**
-1. **Orquestador (n8n)**: Expone webhook y publica mensaje a RabbitMQ
-2. **RabbitMQ**: Cola de mensajería para desacoplar productor/consumidor
-3. **Bot Python**: Consumidor que procesa el CSV
-4. **Loki + Grafana**: Stack de observabilidad para logs y métricas
+### Componentes
+| Capa | Tecnología | Descripción |
+|------|-------------|-------------|
+| **Orquestación** | n8n | Expone webhook y publica mensajes JSON a RabbitMQ. |
+| **Broker** | RabbitMQ | Cola `rpa.cuentas.normalizar.v1` (exchange directo). |
+| **Procesamiento** | Python (Pydantic, Pandas) | Consume, valida y normaliza registros. |
+| **Observabilidad** | Loki + Promtail + Grafana | Centraliza logs y métricas del bot. |
+| **Infraestructura** | Docker + docker-compose | Contenedores reproducibles localmente. |
 
-## 🚀 Inicio del Proceso
+---
 
-El bot se activa al recibir un mensaje JSON en la cola `rpa.cuentas.normalizar.v1`:
+## 🧠 Flujo de Proceso
 
-```json
-{
-  "run_id": "uuid-generado",
-  "archivo": "data/cuentas.csv",
-  "operacion": "normalizar",
-  "umbral_error": 0.15,
-  "meta": {"solicitante": "qa@dsi.local", "fuente": "demo"}
-}
-```
+1. **n8n** recibe una petición (manual o desde alguna herramienta como Postman) en un webhook.
+2. Genera un `run_id` y construye un payload JSON:
+   ```json
+    return {
+      json: {
+        run_id: $execution.id,
+        archivo: "data/cuentas.csv",
+        operacion: "normalizar",
+        umbral_error: 0.15,
+        meta: {
+          solicitante: "qa@dsi.local",
+          fuente: "demo"
+        }
+      }
+    };
+   ```
+3. Publica el mensaje en RabbitMQ (`exchange=rpa.direct`, `queue=rpa.cuentas.normalizar.v1`).
+4. El bot Python consume el mensaje, valida el payload y procesa el CSV.
+5. Si hay errores:
+   - Guarda `out/error_report.json` con detalles.
+   - Envía NACK a la cola.
+6. Si todo es correcto:
+   - Guarda `out/cuentas_normalizadas.csv` y `out/metrics.json`.
+   - Envía ACK a RabbitMQ.
+7. **Promtail** ingiere logs JSONL y los envía a **Loki**, visibles en **Grafana**.
 
-## 📁 Estructura del Proyecto
+---
+
+## 🧱 Estructura del Proyecto
 
 ```
 rpa-normalizador-cuentas/
 ├── app/
 │   ├── main.py              # Entrypoint
 │   ├── consumer.py          # Consumidor RabbitMQ
-│   ├── processor.py         # Lógica de normalización
-│   ├── models.py            # Modelos Pydantic
+│   ├── processor.py         # Normalización y métricas
+│   ├── models.py            # Modelos y validaciones Pydantic
 │   ├── infra/
-│   │   ├── dsi_logger.py    # Logger estructurado
+│   │   ├── dsi_logger.py    # Logging estructurado
 │   │   └── mq.py            # Utilidades RabbitMQ
-│   └── tests/               # Tests unitarios
-├── tools/
-│   └── publish.py           # Script para publicar mensajes
-├── data/
-│   └── cuentas.csv          # Archivo de entrada
-├── out/                     # Salidas generadas
-├── docker-compose.yml       # Infraestructura
-├── requirements.txt         # Dependencias Python
-└── Documentación RPAs/      # Documentación técnica
+│   └── tests/               # Pruebas unitarias
+├── tools/publish.py         # Publicador de mensajes de prueba
+├── data/cuentas.csv         # Archivo de entrada
+├── out/                     # Salidas generadas (gitignored)
+├── docker-compose.yml       # Stack completo (n8n, RMQ, Loki, Grafana)
+├── Dockerfile               # Imagen del bot
+├── promtail-config.yaml     # Config de Promtail
+└── Documentación RPAs/
+    └── RPA-Normalizador-Cuentas/
+        └── Software Design Document/
+            └── Operational Handbook/
+                └── README.md (este documento)
 ```
 
-## ⚙️ Despliegue
+## 🐍 Preparación del Entorno Python (Desarrollo Local)
 
-### Opción A: Docker Local (Recomendado)
+Esta sección aplica solo si se desea ejecutar el bot o sus herramientas auxiliares (`tools/publish.py`, pruebas unitarias) **directamente en el sistema operativo anfitrión**, sin usar Docker.
+
+### 1. Crear y Activar el Entorno Virtual
+
+Se recomienda usar un entorno virtual para aislar las dependencias del proyecto.
 
 ```bash
-# 1. Clonar repositorio
-git clone <repo-url>
-cd rpa-normalizador-cuentas
+# Crear el entorno virtual (llamado 'venv' por convención)
+python3 -m venv venv
 
-# 2. Crear archivo .env
-cp .env.example .env
+# Activar el entorno virtual
+# En macOS/Linux
+source venv/bin/activate
+# En Windows (Command Prompt)
+venv\Scripts\activate.bat
+# En Windows (PowerShell)
+venv\Scripts\Activate.ps1
 
-# 3. Levantar infraestructura
-docker compose up -d
-
-# 4. Crear entorno virtual e instalar dependencias
-python -m venv .venv
-source .venv/bin/activate  # En Windows: .venv\Scripts\activate
+# Con el entorno virtual activo, instala todas las dependencias
 pip install -r requirements.txt
-
-# 5. Ejecutar consumidor
-python -m app.main
 ```
-
-### Opción B: Nube Gratuita
-
-**RabbitMQ**: CloudAMQP (plan Little Lemur - gratuito)
-**n8n**: n8n Desktop o n8n Cloud (community)
-
-Configurar variables en `.env`:
-```bash
-AMQP_URL=amqp://usuario:password@host:5672/vhost
-```
-
-## 🔧 Configuración de n8n
-
-1. Acceder a n8n: `http://localhost:5678` (usuario: admin, password: admin123)
-2. Crear nuevo workflow
-3. Agregar nodo **Webhook** (método POST)
-4. Agregar nodo **RabbitMQ** configurando:
-   - Exchange: `rpa.direct`
-   - Routing Key: `rpa.cuentas.normalizar.v1`
-   - Message: JSON del payload
-5. Activar workflow
-
-## 📊 Configuración de Grafana + Loki
-
-1. Acceder a Grafana: `http://localhost:3000` (admin/admin123)
-2. Agregar Loki como data source: `http://loki:3100`
-3. Importar dashboard para visualizar logs del RPA
-4. Query ejemplo: `{bot_name="RPA-Normalizador-Cuentas"}`
-
-## ▶️ Ejecución
-
-### Método 1: Via n8n
-1. Ejecutar webhook desde n8n UI
-2. Monitorear logs del consumidor en consola
-
-### Método 2: Via script
-```bash
-# Terminal 1: Consumidor
-python -m app.main
-
-# Terminal 2: Publicador
-python tools/publish.py --file data/cuentas.csv --umbral 0.15
-```
-
-## 📈 Monitoreo
-
-### Logs en Consola
-```
-[INFO] [START_PROCESSING] Iniciando procesamiento de data/cuentas.csv
-[INFO] [READ_CSV] Leyendo archivo: data/cuentas.csv
-[INFO] [PROCESS_COMPLETE] Procesamiento completado: 7 válidos, 3 inválidos
-```
-
-### Logs Estructurados (out/logs.jsonl)
-```json
-{"ts": "2024-11-07T10:30:00Z", "bot_name": "RPA-Normalizador-Cuentas", "run_id": "abc-123", "level": "INFO", "step": "PROCESS_COMPLETE", "message": "Procesamiento completado"}
-```
-
-### Métricas (out/metrics.json)
-```json
-{
-  "run_id": "abc-123",
-  "totales": 10,
-  "validos": 7,
-  "invalidos": 3,
-  "porcentaje_invalidos": 30.0,
-  "duracion_ms": 1234.56
-}
-```
-
-### Archivos de Salida
-- `out/cuentas_normalizadas.csv`: Registros válidos
-- `out/metrics.json`: Métricas del procesamiento
-- `out/logs.jsonl`: Logs estructurados
-- `out/error_report.json`: Reporte de errores (solo si falla)
-
-## 🚨 Manejo de Fallas
-
-### Error: Umbral de errores excedido
-**Síntoma**: `error_report.json` generado, mensaje rechazado
-
-**Solución**:
-1. Revisar `error_report.json` para identificar causa
-2. Corregir datos en CSV fuente
-3. Ajustar `umbral_error` si es necesario (max 1.0)
-4. Re-publicar mensaje
-
-### Error: Archivo no encontrado
-**Solución**: Verificar que la ruta en el payload sea correcta
-
-### Error: Conexión a RabbitMQ fallida
-**Solución**:
-1. Verificar que RabbitMQ esté corriendo: `docker ps`
-2. Verificar variables en `.env`
-3. Reiniciar: `docker compose restart rabbitmq`
-
-### Error: Formato de fecha inválido
-**Logs**: `[ERROR] [NORMALIZE_FECHA] Error parseando fecha`
-
-**Solución**: El bot rechaza automáticamente registros con fechas inválidas
-
-## 🧪 Pruebas
-
-```bash
-# Ejecutar tests
-pytest app/tests/ -v
-
-# Con cobertura
-pytest app/tests/ --cov=app --cov-report=html
-```
-
-## 🔐 Variables de Entorno
-
-| Variable | Descripción | Valor por Defecto |
-|----------|-------------|-------------------|
-| AMQP_URL | URL de RabbitMQ | `amqp://admin:admin123@localhost:5672/` |
-| RABBITMQ_QUEUE | Nombre de la cola | `rpa.cuentas.normalizar.v1` |
-| RABBITMQ_EXCHANGE | Exchange directo | `rpa.direct` |
-| RABBITMQ_ROUTING_KEY | Routing key | `rpa.cuentas.normalizar.v1` |
-| LOKI_URL | URL de Loki | `http://localhost:3100` |
-
-## 📝 Reglas de Normalización
-
-1. **id_cuenta**: Strip, mayúsculas, alfanumérico (permite guiones)
-2. **fecha_emision**: Parse a ISO YYYY-MM-DD, validar fechas reales
-3. **monto**: Float positivo, reemplazar comas por puntos
-4. **estado**: Uno de {PENDIENTE, ENVIADA, APROBADA, RECHAZADA}
-
-## 🎬 Demo
-
-Ver video demostrativo en: `Documentación RPAs/RPA-Normalizador-Cuentas/Product Design Document/Video/demo.mp4`
-
-## 📞 Soporte
-
-En caso de problemas:
-1. Revisar logs en `out/logs.jsonl`
-2. Consultar `error_report.json` si existe
-3. Verificar conectividad a RabbitMQ
-4. Contactar al equipo DSI Factory
 
 ---
 
-**"DSI no opera. DSI orquesta."**
+## 🚀 Despliegue Local (Docker Compose)
+
+### 1. Clonar y preparar entorno
+```bash
+git clone https://github.com/mariajosearcano/rpa-normalizador-cuentas
+cd rpa-normalizador-cuentas
+```
+
+### 2. Crear archivo `.env` en la raiz
+```bash
+AMQP_URL=amqp://admin:admin123@rabbitmq:5672/
+RABBITMQ_QUEUE=rpa.cuentas.normalizar.v1
+RABBITMQ_EXCHANGE=rpa.direct
+RABBITMQ_ROUTING_KEY=rpa.cuentas.normalizar.v1
+LOKI_URL=http://loki:3100
+```
+
+### 3. Levantar infraestructura
+```bash
+docker compose up -d
+```
+Servicios incluidos:
+- `rabbitmq`: cola y panel `http://localhost:15672`
+- `n8n`: orquestador `http://localhost:5678`
+- `loki`: almacenamiento de logs `http://localhost:3100`
+- `promtail`: ingesta de logs
+- `grafana`: dashboard `http://localhost:3000`
+- `rpa-bot`: consumidor Python
+
+---
+
+## 🧩 Ejecución
+
+### Opción A — Desde n8n
+1. Abre `http://localhost:5678`.
+2. Importa el flujo `definitions/n8n-workflow.json`.
+3. Activa el workflow y lanza el webhook manualmente.
+4. Monitorea en tiempo real desde Grafana.
+
+### Opción B — Desde Postman
+1. Método: `POST`
+2. URL: `http://localhost:5678/webhook/51c2e836-b004-44fc-83c0-06908bc87f88`
+3. Body (raw / JSON):
+   ```json
+   {
+     "archivo": "data/cuentas.csv",
+     "umbral_error": 0.15
+   }
+   ```
+4. Verifica que el bot consuma el mensaje (logs en consola o Grafana).
+
+### Opción C — Script manual
+```bash
+python tools/publish.py --file data/cuentas.csv --umbral 0.15
+```
+*Nota: Para el uso manual sin ayuda del orquestador, hay que descomentar los archivos que estan en app/infra/ y tools/*
+
+---
+
+## 📈 Monitoreo y Observabilidad
+
+| Elemento | Ubicación | Descripción |
+|-----------|------------|--------------|
+| **Logs en consola** | `docker logs rpa-bot` | Eventos estructurados (INFO/ERROR). |
+| **Logs JSONL** | `out/logs.jsonl` | Listo para Promtail/Loki. |
+| **Dashboard Grafana** | `http://localhost:3000` | Panel: *RPA Normalizador de Cuentas – Logs*. |
+| **Consultas Loki** | `{job="rpa-normalizador-cuentas"}` | Filtrado de eventos por run_id o nivel. |
+
+Ejemplo de log:
+```json
+{
+  "ts": "2025-11-10T22:35:23Z",
+  "bot_name": "RPA-Normalizador-Cuentas",
+  "run_id": "abc-123",
+  "level": "INFO",
+  "step": "PROCESS_COMPLETE",
+  "message": "Procesamiento completado"
+}
+```
+
+---
+
+## ⚠️ Manejo de Errores
+
+| Escenario | Resultado | Archivo generado |
+|------------|------------|------------------|
+| Archivo no encontrado | NACK | `error_report.json` |
+| % inválidos > umbral | NACK | `error_report.json` |
+| Excepción inesperada | NACK | `error_report.json` |
+
+**Estructura del reporte:**
+```json
+{
+  "run_id": "uuid",
+  "timestamp": "2025-11-10T23:00:00Z",
+  "mensaje": "Umbral de error excedido",
+  "stacktrace_resumido": "...",
+  "contexto": {"payload": {...}}
+}
+```
+
+---
+
+## 🧪 Pruebas Unitarias
+```bash
+pytest app/tests/ -v
+```
+
+**Cobertura mínima esperada:** validaciones de fecha, monto y métricas.  
+**Framework:** `pytest` con configuración en `pytest.ini`.
+
+---
+
+## 🧰 Tecnologías Utilizadas
+
+| Categoría | Tecnología |
+|------------|-------------|
+| Lenguaje | Python slim |
+| Orquestación | n8n |
+| Mensajería | RabbitMQ |
+| Observabilidad | Loki, Promtail, Grafana |
+| Infraestructura | Docker, Docker Compose |
+| Testing | pytest |
+| API Client | Postman |
+| Documentación | Markdown + Mermaid |
+
+---
+
+## 🧭 Buenas Prácticas Aplicadas
+- Separación clara por capas (`app/`, `infra/`, `tests/`).
+- Validaciones declarativas con **Pydantic**.
+- Logs estructurados JSONL listos para ingestión.
+- Manejo de **ACK/NACK** con control de errores.
+- Ejecución idempotente por `run_id`.
+- Tipado estático y docstrings PEP8.
+- Integración directa con observabilidad (Loki/Grafana).
+
+---
+
+## 🗺️ Diagramas
+
+### Arquitectura
+Ubicado en `Documentación RPAs/RPA-Normalizador-Cuentas/Software Design Document/Diagrama de arquitectura/arquitectura.png` o en formato Mermaid en `definitions/arquitectura.mermaid`
+
+### Flujo de Proceso
+Ubicado en `Documentación RPAs/RPA-Normalizador-Cuentas/Software Design Document/Diagrama de flujo/flujo.png` o en formato Mermaid en `definitions/flujo.mermaid`
+
+Visualizan el recorrido desde el webhook hasta la salida en `out/`.
+
+---
+
+## 📦 Resultados Esperados
+- `out/cuentas_normalizadas.csv` → registros válidos  
+- `out/metrics.json` → métricas de ejecución  
+- `out/logs.jsonl` → logs estructurados  
+- `out/error_report.json` → errores críticos  
+
+---
+
+## 🧭 Guía Rápida
+
+```bash
+# 1. Levantar stack
+docker compose up -d
+
+# 2. Publicar mensaje (vía script)
+## para n8n mediante herramientas como Postman
+python tools/publish.py --file data/cuentas.csv --umbral 0.15
+
+# 3. Ver resultados
+cat out/metrics.json
+```
+
+---
+
+## 📖 Límites y Recomendaciones
+- **RabbitMQ local**: persistencia en volumen `rabbitmq_data`.
+- **Loki/Grafana**: stack observabilidad solo retiene logs recientes (<24h por defecto).
+- **n8n Desktop**: ejecutar como `localhost:5678`.
+- **Postman**: alternativa a webhook visual para pruebas rápidas.
+
+---
+
+## 🧾 Créditos
+Desarrollado por **María José Arcila Cano**  
+Rol: *Computer Engineering (Prueba Técnica DSI Factory)*  
+Versión del documento: **v1.0 — Noviembre 2025**
