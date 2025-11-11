@@ -1,0 +1,95 @@
+{
+  "name": "rpa-normalizador-cuentas",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "51c2e836-b004-44fc-83c0-06908bc87f88",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d7549156-36dd-4a12-9fcd-1d1721c77ac9",
+      "name": "Webhook",
+      "webhookId": "51c2e836-b004-44fc-83c0-06908bc87f88",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    run_id: $execution.id,\n    archivo: \"data/cuentas.csv\",\n    operacion: \"normalizar\",\n    umbral_error: 0.7,\n    meta: {\n      solicitante: \"qa@dsi.local\",\n      fuente: \"demo\"\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "4c166400-07cc-418c-905f-5d2033ae648b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "mode": "exchange",
+        "exchange": "rpa.direct",
+        "exchangeType": "direct",
+        "routingKey": "rpa.cuentas.normalizar.v1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rabbitmq",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        0
+      ],
+      "id": "54d7ccb4-7637-40a5-9de5-d425dbe55844",
+      "name": "RabbitMQ",
+      "credentials": {
+        "rabbitmq": {
+          "id": "oS2dRq5LDdqqS5im",
+          "name": "RabbitMQ account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "RabbitMQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c1a413e0-7627-4616-8408-ede2b41b860c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "80cbb7e2046d1e6a6743525cb63af935141feca055df10162419e2382ea7e022"
+  },
+  "id": "6Y4fbAVsLUILjrho",
+  "tags": []
+}

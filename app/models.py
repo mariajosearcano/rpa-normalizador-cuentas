@@ -3,7 +3,7 @@ Modelos de datos y validaciones
 """
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator
-from datetime import datetime
+from datetime import datetime, UTC # Importa datetime y el nuevo objeto UTC
 
 
 class MessagePayload(BaseModel):
@@ -38,13 +38,13 @@ class ProcessingMetrics(BaseModel):
     invalidos: int
     porcentaje_invalidos: float
     duracion_ms: float
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class ErrorReport(BaseModel):
     """Reporte de error estructurado"""
     run_id: str
-    timestamp: str
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     mensaje: str
     stacktrace_resumido: str
     metricas: Optional[Dict[str, Any]] = None

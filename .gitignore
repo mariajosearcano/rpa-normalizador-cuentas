@@ -9,8 +9,8 @@ __pycache__/
 .coverage
 
 # Archivos de Salida y Logs
-#out/
-#*.log
+out/
+*.log
 
 # Archivos de Configuración Local y Secreta
 *.env

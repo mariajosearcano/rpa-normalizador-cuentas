@@ -38,7 +38,6 @@ class CuentasProcessor:
         """Parsea fecha a ISO YYYY-MM-DD"""
         try:
             # Intentar parsear la fecha
-            #dt = parser.parse(fecha, dayfirst=False)
             if "-" in fecha:
                 dt = parser.parse(fecha, dayfirst=True)
             else:

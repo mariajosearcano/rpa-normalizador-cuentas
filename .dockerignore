@@ -50,3 +50,7 @@ htmlcov/
 
 # Config files (se montan como volumes)
 config/
+
+# Archivos de Salida y Logs
+out/
+*.log
